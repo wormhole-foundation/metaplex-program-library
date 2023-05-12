@@ -1,66 +1,34 @@
-pub(crate) mod asset_data;
-pub(crate) mod collection;
-pub(crate) mod creator;
-pub(crate) mod data;
-pub(crate) mod delegate;
-pub(crate) mod edition;
-pub(crate) mod edition_marker;
-pub(crate) mod escrow;
-pub(crate) mod master_edition;
-pub(crate) mod metadata;
-pub(crate) mod migrate;
-pub(crate) mod programmable;
-pub(crate) mod reservation;
-pub(crate) mod token_auth_payload;
-pub(crate) mod uses;
+pub mod collection;
+pub mod creator;
+pub mod data;
+pub mod metadata;
+pub mod uses;
 
-use std::io::ErrorKind;
-
-pub use asset_data::*;
-use borsh::{maybestd::io::Error as BorshError, BorshDeserialize, BorshSerialize};
 pub use collection::*;
 pub use creator::*;
 pub use data::*;
-pub use delegate::*;
-pub use edition::*;
-pub use edition_marker::*;
-pub use escrow::*;
-pub use master_edition::*;
 pub use metadata::*;
-pub use migrate::*;
-use mpl_utils::resize_or_reallocate_account_raw;
-use num_derive::FromPrimitive;
-use num_traits::FromPrimitive;
-pub use programmable::*;
-pub use reservation::*;
-use shank::ShankAccount;
-use solana_program::{
-    account_info::AccountInfo, entrypoint::ProgramResult, program_error::ProgramError,
-    pubkey::Pubkey,
-};
-use spl_token::state::Account as TokenAccount;
 pub use uses::*;
-#[cfg(feature = "serde-feature")]
-use {
-    serde::{Deserialize, Deserializer, Serialize},
-    serde_with::{As, DisplayFromStr},
-    std::str::FromStr,
-};
 
-// Re-export constants to maintain compatibility.
-pub use crate::pda::{BURN, COLLECTION_AUTHORITY, EDITION, PREFIX, USER};
 use crate::{
-    assertions::assert_owned_by,
+    assertions::misc::assert_owned_by,
     error::MetadataError,
-    utils::{meta_deser_unchecked, try_from_slice_checked},
     ID,
 };
-
-/// Index of the discriminator on the account data.
-pub const DISCRIMINATOR_INDEX: usize = 0;
+use borsh::{
+    maybestd::io::Error as BorshError,
+    BorshDeserialize,
+    BorshSerialize,
+};
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
+use solana_program::{
+    account_info::AccountInfo,
+    program_error::ProgramError,
+};
+use std::io::ErrorKind;
 
 #[repr(C)]
-#[cfg_attr(feature = "serde-feature", derive(Serialize, Deserialize))]
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Eq, Debug, Clone, Copy, FromPrimitive)]
 pub enum TokenStandard {
     NonFungible,             // This is a master edition
@@ -121,7 +89,6 @@ where {
 }
 
 #[repr(C)]
-#[cfg_attr(feature = "serde-feature", derive(Serialize, Deserialize))]
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Eq, Debug, Clone, Copy, FromPrimitive)]
 pub enum Key {
     Uninitialized,
@@ -137,70 +104,4 @@ pub enum Key {
     TokenOwnedEscrow,
     TokenRecord,
     MetadataDelegate,
-}
-
-#[cfg(feature = "serde-feature")]
-fn deser_option_pubkey<'de, D>(deserializer: D) -> Result<Option<Pubkey>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    <Option<String> as serde::de::Deserialize>::deserialize(deserializer)?
-        .map(|s| Pubkey::from_str(&s))
-        .transpose()
-        .map_err(serde::de::Error::custom)
-}
-
-#[cfg(feature = "serde-feature")]
-fn ser_option_pubkey<S>(pubkey: &Option<Pubkey>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    let pubkey_string = pubkey.as_ref().map(|p| p.to_string());
-    serde::ser::Serialize::serialize(&pubkey_string, serializer)
-}
-
-/// Trait for resizable accounts.
-///
-/// Implementing this trait for a type will automatically allow the use of the `save` method,
-/// which can modify the size of an account.
-///
-/// A type implementing this trait must specify the `from_bytes` method, since an account can
-/// have variable size.
-pub trait Resizable: TokenMetadataAccount + BorshSerialize {
-    /// Saves the information to the specified account, resizing the account if needed.
-    ///
-    /// The account size can either increase or decrease depending on whether the account size
-    /// matches the struct size or not.
-    fn save<'a>(
-        &self,
-        account_info: &'a AccountInfo<'a>,
-        payer_info: &'a AccountInfo<'a>,
-        system_program_info: &'a AccountInfo<'a>,
-    ) -> Result<(), ProgramError> {
-        // the required account size
-        let required_size = Self::size();
-
-        if account_info.data_len() != required_size {
-            resize_or_reallocate_account_raw(
-                account_info,
-                payer_info,
-                system_program_info,
-                required_size,
-            )?;
-        }
-
-        let mut account_data = account_info.data.borrow_mut();
-        // passes a slice to borsh so the internal account data array does not get
-        // temporarily resized
-        let mut storage = &mut account_data[..required_size];
-        BorshSerialize::serialize(self, &mut storage)?;
-
-        Ok(())
-    }
-
-    /// Deserializes the struct data from the specified byte array.
-    ///
-    /// In most cases this will perform a custom deserialization since the size of the
-    /// stored byte array (account) can change.
-    fn from_bytes(data: &[u8]) -> Result<Self, ProgramError>;
 }

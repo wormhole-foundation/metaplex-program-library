@@ -4,7 +4,10 @@ use num_derive::FromPrimitive;
 use solana_program::{
     decode_error::DecodeError,
     msg,
-    program_error::{PrintProgramError, ProgramError},
+    program_error::{
+        PrintProgramError,
+        ProgramError,
+    },
 };
 use thiserror::Error;
 
@@ -749,10 +752,6 @@ pub enum MetadataError {
     /// 189
     #[error("Invalid or removed instruction")]
     InvalidInstruction,
-
-    /// 190
-    #[error("Missing delegate record")]
-    MissingDelegateRecord,
 }
 
 impl PrintProgramError for MetadataError {

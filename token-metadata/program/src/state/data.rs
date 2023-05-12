@@ -1,7 +1,14 @@
-use super::*;
+use crate::state::{
+    collection::Collection,
+    creator::Creator,
+    uses::Uses,
+};
+use borsh::{
+    BorshDeserialize,
+    BorshSerialize,
+};
 
 #[repr(C)]
-#[cfg_attr(feature = "serde-feature", derive(Serialize, Deserialize))]
 #[derive(BorshSerialize, BorshDeserialize, Default, PartialEq, Eq, Debug, Clone)]
 pub struct Data {
     /// The name of the asset
@@ -17,7 +24,6 @@ pub struct Data {
 }
 
 #[repr(C)]
-#[cfg_attr(feature = "serde-feature", derive(Serialize, Deserialize))]
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Eq, Debug, Clone)]
 pub struct DataV2 {
     /// The name of the asset
@@ -34,17 +40,4 @@ pub struct DataV2 {
     pub collection: Option<Collection>,
     /// Uses
     pub uses: Option<Uses>,
-}
-
-impl DataV2 {
-    pub fn to_v1(&self) -> Data {
-        let ns = self.clone();
-        Data {
-            name: ns.name,
-            symbol: ns.symbol,
-            uri: ns.uri,
-            seller_fee_basis_points: ns.seller_fee_basis_points,
-            creators: ns.creators,
-        }
-    }
 }
